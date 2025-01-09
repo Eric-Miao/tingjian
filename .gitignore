@@ -1,0 +1,10 @@
+secrets.txt
+uploaded_images
+images/
+.venv/
+.ipython-version
+*.png
+*.jpg
+*.jpeg
+*.gif
+.DS_Store
