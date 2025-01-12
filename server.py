@@ -12,11 +12,10 @@ import logging
 
 # Set up logging
 logger = logging.getLogger("tingjian")
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 # Flask application setup
-app = Flask(__name__, static_url_path='/tingjian/static')
-app.config['APPLICATION_ROOT'] = '/tingjian'
+app = Flask(__name__, static_url_path='/static')
 
 socketio = SocketIO(app)
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -29,14 +28,44 @@ else:
     client = OpenAI(api_key=api_key)
 
 
-# Route for index page
 @app.route("/")
 def index():
-    return render_template("index.html")
+    # Get the latest image and description files
+    image_dir = "./uploaded_images/"
+    images = sorted(
+        [f for f in os.listdir(image_dir) if f.endswith(".jpg")],
+        key=lambda x: os.path.getmtime(os.path.join(image_dir, x)),
+        reverse=True,
+    )
+    descriptions = sorted(
+        [f for f in os.listdir(image_dir) if f.endswith(".txt")],
+        key=lambda x: os.path.getmtime(os.path.join(image_dir, x)),
+        reverse=True,
+    )
 
+    # Get the latest image and description if available
+    latest_image = images[0] if images else None
+    latest_description = descriptions[0] if descriptions else None
+
+    # Construct file paths for rendering
+    latest_image_url = (
+        f"/uploaded_images/{latest_image}" if latest_image else None
+    )
+    print(f"latest_image_url:{latest_image_url}")
+    latest_description_text = (
+        open(os.path.join(image_dir, latest_description)).read()
+        if latest_description
+        else "No description available."
+    )
+
+    return render_template(
+        "index.html",
+        latest_image=latest_image_url,
+        latest_description=latest_description_text,
+    )
 
 # Route for image upload
-@app.route("/tingjian/upload", methods=["POST"])
+@app.route("/upload", methods=["POST"])
 def upload_image():
     logger.info("Image received!")
     image_received_time = time.time()
@@ -96,8 +125,12 @@ def _get_description_from_image(image):
 
 # Helper function to save images locally
 def _save_image(image):
+    static_image_dir = "./uploaded_images/"
+    if not os.path.exists(static_image_dir):
+        os.makedirs(static_image_dir)
+
     datestr = datetime.now().strftime("%Y-%m-%d_%H%M%S.%f")[:-3]
-    filename = f"./uploaded_images/{datestr}.jpg"
+    filename = os.path.join(static_image_dir, f"{datestr}.jpg")
     image.save(fp=filename)
     logger.debug(f"Image saved as {filename}")
 
@@ -123,4 +156,4 @@ if __name__ == "__main__":
         os.makedirs("uploaded_images")
 
     # Run the Flask application on localhost at port 5000
-    socketio.run(app, host="127.0.0.1", port=5000, debug=True)
+    socketio.run(app, host="0.0.0.0", port=9999, debug=True)

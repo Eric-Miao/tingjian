@@ -3,19 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+    <title>Latest Upload</title>
 </head>
 <body>
-    <div id="messagebox"></div>
-    <script>
-        const socket = io("<YOUR HOST>:80");
+    <h1>Latest Uploaded Image</h1>
 
-        socket.on('new_description', function(data) {
-            const messagebox = document.getElementById('messagebox');
-            if (data["message"]) {
-                messagebox.textContent = data["message"];
-            }
-        });
-    </script>
+    {% if latest_image %}
+        <img src="{{ latest_image }}" alt="Latest Uploaded Image" style="max-width: 100%; height: auto;">
+    {% else %}
+        <p>No image uploaded yet.</p>
+    {% endif %}
+
+    <h2>Description</h2>
+    <p>{{ latest_description }}</p>
+
 </body>
 </html>
