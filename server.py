@@ -26,7 +26,7 @@ from flask import jsonify, request
 load_dotenv()
 qwen_api_key = os.getenv('DASHSCOPE_API_KEY')
 API_TOKENS = set(os.getenv('ALLOWED_API_TOKENS', '').split(','))
-URL_PREFIX='tingjian'
+URL_PREFIX='/tingjian'
 
 # Set up logging to display in the console
 logger = logging.getLogger("tingjian")
