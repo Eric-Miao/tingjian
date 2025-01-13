@@ -126,12 +126,14 @@ def generate_jwt_token(user_id=None,immortal=False):
     else:
         expiration = datetime.now(UTC) + timedelta(hours=24)  # Token expires in 24 hours
 
-    return jwt.encode(
-        {
+    new_info = {
             'user_id': user_id if user_id is not None else str(uuid.uuid4()),
             'exp': expiration
-        },
-        os.getenv('JWT_SECRET_KEY', 'your-secret-key'),
+        }
+
+    return new_info, jwt.encode(
+        new_info,
+        os.getenv('JWT_SECRET_KEY'),
         algorithm="HS256"
     )
 
