@@ -15,3 +15,5 @@ uploaded_images/
 
 
 *.ipynb
+
+__pycache__/
