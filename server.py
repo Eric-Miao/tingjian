@@ -2,7 +2,7 @@ import base64
 import io
 import os
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from PIL import Image
 from flask import Flask, request, render_template, url_for, redirect, jsonify
 from flask_cors import CORS
@@ -33,6 +33,13 @@ logger = logging.getLogger("tingjian")
 logger.setLevel(logging.DEBUG)
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.DEBUG)
+console_handler.setFormatter(logging.Formatter('[%(d)s/%(b)s/%(Y)s %(H)s:%(M)s:%(S)s] - %(name)s - %(levelname)s - %(message)s',
+                                            defaults={'d': datetime.now().strftime('%d'),
+                                                     'b': datetime.now().strftime('%b'),
+                                                     'Y': datetime.now().strftime('%Y'),
+                                                     'H': datetime.now().strftime('%H'),
+                                                     'M': datetime.now().strftime('%M'),
+                                                     'S': datetime.now().strftime('%S')}))
 logger.addHandler(console_handler)
 
 # Flask application setup
@@ -91,16 +98,16 @@ def require_jwt_token(f):
             try:
                 payload = jwt.decode(
                     token, 
-                    os.getenv('JWT_SECRET_KEY', 'your-secret-key'), 
+                    os.getenv('JWT_SECRET_KEY'), 
                     algorithms=["HS256"]
                 )
-                # You can add additional checks here, like expiration time
-                logger.info(f"You are exp is {payload['exp']}")
-                if payload['exp'] != -1:
-                    if datetime.fromtimestamp(payload['exp']) < datetime.now(datetime.UTC):
-                        return jsonify({"error": "Token has expired"}), 401
                 
+                # Log the expiration time
+                logger.info(f"Token expiration time: {datetime.fromtimestamp(payload['exp'])}")
+                
+                # For regular tokens, let jwt.decode handle expiration
                 return f(*args, **kwargs)
+                
             except jwt.ExpiredSignatureError:
                 return jsonify({"error": "Token has expired"}), 401
             except jwt.InvalidTokenError:
@@ -112,13 +119,17 @@ def require_jwt_token(f):
     return decorated_function
 
 # Add this utility function to generate JWT tokens (you'll need this for your login route)
-def generate_jwt_token(user_id,immortal=False):
+def generate_jwt_token(user_id=None,immortal=False):
     
-    expiration = datetime.now(datetime.UTC) + timedelta(hours=24)  # Token expires in 24 hours
+    if immortal:
+        expiration = datetime.now(UTC) + timedelta(weeks=9999)
+    else:
+        expiration = datetime.now(UTC) + timedelta(hours=24)  # Token expires in 24 hours
+
     return jwt.encode(
         {
             'user_id': user_id if user_id is not None else str(uuid.uuid4()),
-            'exp': -1 if immortal else expiration
+            'exp': expiration
         },
         os.getenv('JWT_SECRET_KEY', 'your-secret-key'),
         algorithm="HS256"
