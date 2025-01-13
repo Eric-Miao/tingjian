@@ -92,6 +92,7 @@ def require_jwt_token(f):
                     algorithms=["HS256"]
                 )
                 # You can add additional checks here, like expiration time
+                logger.info(f"You are exp is {payload['exp']}")
                 if payload['exp'] != -1:
                     if datetime.fromtimestamp(payload['exp']) < datetime.now(datetime.UTC):
                         return jsonify({"error": "Token has expired"}), 401
@@ -114,7 +115,7 @@ def generate_jwt_token(user_id,immortal=False):
     return jwt.encode(
         {
             'user_id': user_id if user_id is not None else str(uuid.uuid4()),
-            'exp': expiration if not immortal else -1
+            'exp': -1 if immortal else expiration
         },
         os.getenv('JWT_SECRET_KEY', 'your-secret-key'),
         algorithm="HS256"
