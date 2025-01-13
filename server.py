@@ -133,7 +133,8 @@ async def upload_image(request: Request,credentials: HTTPAuthorizationCredential
         f"New description: {description} (latency: {time.time() - image_received_time:.2f}s)"
     )
     
-    return {"status": "OK"}
+    return {"status": "OK",
+            "description":description}
 
 # Helper functions remain largely the same
 def _base64_encode_image(image):
