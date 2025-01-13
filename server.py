@@ -10,6 +10,13 @@ from flask_socketio import SocketIO
 from openai import OpenAI
 import logging
 
+from dotenv import load_dotenv
+from langchain_community.chat_models.tongyi import ChatTongyi
+from langchain_core.messages import HumanMessage, SystemMessage
+
+load_dotenv()
+qwen_api_key = os.getenv('DASHSCOPE_API_KEY')
+
 # Set up logging
 logger = logging.getLogger("tingjian")
 logger.setLevel(logging.DEBUG)
@@ -26,6 +33,15 @@ if api_key is None:
     logger.info("Missing API_KEY")
 else:
     client = OpenAI(api_key=api_key)
+
+if qwen_api_key is None:
+    logger.info("Missing Qwen API KAY")
+else:
+    client = OpenAI(
+    # 若没有配置环境变量，请用百炼API Key将下行替换为：api_key="sk-xxx"
+        api_key=qwen_api_key,
+        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+    )
 
 
 @app.route("/")
@@ -77,7 +93,7 @@ def upload_image():
     # Generate a description (mocked for now)
     description = 'test ' + str(image_received_time)
     # Uncomment to enable real AI-based descriptions:
-    # description = _get_description_from_image(image)
+    description = _tongyi_get_description_from_image(image)
     _save_description(description)
 
     # Emit the description to connected clients
@@ -91,10 +107,8 @@ def upload_image():
 
 # Helper function to encode images as Base64
 def _base64_encode_image(image):
-    img_buffer = io.BytesIO()
-    image.save(img_buffer, format="JPEG")
-    byte_data = img_buffer.getvalue()
-    return base64.b64encode(byte_data).decode("utf-8")
+    with open(image, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode('utf-8')
 
 
 # Helper function to generate descriptions using OpenAI
@@ -122,6 +136,40 @@ def _get_description_from_image(image):
     logger.info(f"Response content: {response.choices[0].message.content}")
     return response.choices[0].message.content
 
+def _tongyi_get_description_from_image(image):
+    logger.info("getting description using tongyi qwen")
+    base64_image = _base64_encode_image(image)
+
+    prompt = "你需要将图片描述给看不到这个图片的人. 请简略的描述图片内容,包括图片中的物体和拍摄者的相对位置关系. 不要提及这是一张图片. 越短越好"
+
+    messages = [
+            {"role":"system",
+             "content": [
+                 {
+                    "type": "text",
+                    "text": prompt 
+                 }
+             ]}
+            ,{
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}, 
+                    },
+                    {"type": "text", "text": "这是什么?"},
+                ],
+            }
+        ]
+
+    response = client.chat.completions.create(
+        model="qwen-vl-max-latest",
+        messages=messages,
+    )
+    
+    logger.debug(f"Response: {response}")
+    logger.info(f"Response content: {response.choices[0].message.content}")
+    return response.choices[0].message.content
 
 # Helper function to save images locally
 def _save_image(image):
