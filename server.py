@@ -25,6 +25,7 @@ logger.setLevel(logging.DEBUG)
 
 # Flask application setup
 app = Flask(__name__, static_url_path='/static', static_folder='uploaded_images')
+app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your-default-secret-key-for-development')
 
 socketio = SocketIO(app)
 CORS(app, resources={r"/*": {"origins": "*"}})
