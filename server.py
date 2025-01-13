@@ -28,9 +28,12 @@ qwen_api_key = os.getenv('DASHSCOPE_API_KEY')
 API_TOKENS = set(os.getenv('ALLOWED_API_TOKENS', '').split(','))
 
 
-# Set up logging
+# Set up logging to display in the console
 logger = logging.getLogger("tingjian")
 logger.setLevel(logging.DEBUG)
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.DEBUG)
+logger.addHandler(console_handler)
 
 # Flask application setup
 app = Flask(__name__, static_url_path='/static', static_folder='uploaded_images')
