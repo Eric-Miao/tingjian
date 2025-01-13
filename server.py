@@ -88,12 +88,12 @@ def upload_image():
 
     # Decode the image from the POST request
     image = Image.open(io.BytesIO(request.get_data()))
-    _save_image(image)
+    filename = _save_image(image)
 
     # Generate a description (mocked for now)
     description = 'test ' + str(image_received_time)
     # Uncomment to enable real AI-based descriptions:
-    description = _tongyi_get_description_from_image(image)
+    description = _tongyi_get_description_from_image(filename)
     _save_description(description)
 
     # Emit the description to connected clients
@@ -181,7 +181,7 @@ def _save_image(image):
     filename = os.path.join(static_image_dir, f"{datestr}.jpg")
     image.save(fp=filename)
     logger.debug(f"Image saved as {filename}")
-
+    return filename
 
 # Helper function to save descriptions locally
 def _save_description(description):
