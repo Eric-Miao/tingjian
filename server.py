@@ -4,20 +4,29 @@ import os
 import time
 from datetime import datetime, timedelta
 from PIL import Image
-from flask import Flask, request, render_template, url_for, redirect
+from flask import Flask, request, render_template, url_for, redirect, jsonify
 from flask_cors import CORS
 from flask_socketio import SocketIO
 from openai import OpenAI
 import logging
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
-
+from functools import wraps
+import jwt
+import uuid
 
 from dotenv import load_dotenv
 from langchain_community.chat_models.tongyi import ChatTongyi
 from langchain_core.messages import HumanMessage, SystemMessage
 
+# Add these imports (if not already present)
+from functools import wraps
+from flask import jsonify, request
+
+# Add after other configurations
 load_dotenv()
 qwen_api_key = os.getenv('DASHSCOPE_API_KEY')
+API_TOKENS = set(os.getenv('ALLOWED_API_TOKENS', '').split(','))
+
 
 # Set up logging
 logger = logging.getLogger("tingjian")
@@ -61,6 +70,55 @@ class User(UserMixin):
 @login_manager.user_loader
 def load_user(user_id):
     return User(user_id)
+
+def require_jwt_token(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            return jsonify({"error": "No Authorization header"}), 401
+        
+        try:
+            # Check if header follows "Bearer <token>" format
+            auth_type, token = auth_header.split(' ')
+            if auth_type.lower() != 'bearer':
+                return jsonify({"error": "Invalid authorization type"}), 401
+            
+            # Verify and decode the JWT token
+            try:
+                payload = jwt.decode(
+                    token, 
+                    os.getenv('JWT_SECRET_KEY', 'your-secret-key'), 
+                    algorithms=["HS256"]
+                )
+                # You can add additional checks here, like expiration time
+                if payload['exp'] != -1:
+                    if datetime.fromtimestamp(payload['exp']) < datetime.now(datetime.UTC):
+                        return jsonify({"error": "Token has expired"}), 401
+                
+                return f(*args, **kwargs)
+            except jwt.ExpiredSignatureError:
+                return jsonify({"error": "Token has expired"}), 401
+            except jwt.InvalidTokenError:
+                return jsonify({"error": "Invalid token"}), 401
+                
+        except ValueError:
+            return jsonify({"error": "Invalid Authorization header format"}), 401
+            
+    return decorated_function
+
+# Add this utility function to generate JWT tokens (you'll need this for your login route)
+def generate_jwt_token(user_id,immortal=False):
+    
+    expiration = datetime.now(datetime.UTC) + timedelta(hours=24)  # Token expires in 24 hours
+    return jwt.encode(
+        {
+            'user_id': user_id if user_id is not None else str(uuid.uuid4()),
+            'exp': expiration if not immortal else -1
+        },
+        os.getenv('JWT_SECRET_KEY', 'your-secret-key'),
+        algorithm="HS256"
+    )
 
 # Add login routes
 @app.route('/login', methods=['GET', 'POST'])
@@ -121,9 +179,8 @@ def index():
         latest_description=latest_description_text,
     )
 
-# Route for image upload
 @app.route("/upload", methods=["POST"])
-@login_required
+@require_jwt_token
 def upload_image():
     logger.info("Image received!")
     image_received_time = time.time()
