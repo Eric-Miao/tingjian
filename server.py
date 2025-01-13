@@ -118,6 +118,39 @@ def require_jwt_token(f):
             
     return decorated_function
 
+
+def require_bearer_token(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            return jsonify({"error": "No Authorization header"}), 401
+        
+        try:
+            # Check if header follows "Bearer <token>" format
+            auth_type, token = auth_header.split(' ')
+            if auth_type.lower() != 'bearer':
+                return jsonify({"error": "Invalid authorization type"}), 401
+            
+            # Verify the token
+            if token not in os.getenv('BEARER_TOKENS').split(','):
+                return jsonify({"error": "Invalid token"}), 401
+            
+            return f(*args, **kwargs)
+                
+        except ValueError:
+            return jsonify({"error": "Invalid Authorization header format"}), 401
+            
+    return decorated_function
+
+
+
+def generate_bearer_token():
+    import secrets
+    return secrets.token_urlsafe(32)
+
+
+
 # Add this utility function to generate JWT tokens (you'll need this for your login route)
 def generate_jwt_token(user_id=None,immortal=False):
     
@@ -197,7 +230,8 @@ def index():
     )
 
 @app.route("/upload", methods=["POST"])
-@require_jwt_token
+# @require_jwt_token
+@require_bearer_token
 def upload_image():
     logger.info("Image received!")
     image_received_time = time.time()
