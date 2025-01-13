@@ -2,13 +2,15 @@ import base64
 import io
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from PIL import Image
-from flask import Flask, request, render_template, url_for
+from flask import Flask, request, render_template, url_for, redirect
 from flask_cors import CORS
 from flask_socketio import SocketIO
 from openai import OpenAI
 import logging
+from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+
 
 from dotenv import load_dotenv
 from langchain_community.chat_models.tongyi import ChatTongyi
@@ -44,8 +46,44 @@ else:
     )
     logger.info("Qwen client loaded")
 
+# Add Login Manager setup after Flask app initialization
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
 
+# Add a simple User class
+class User(UserMixin):
+    def __init__(self, id):
+        self.id = id
+
+# Add user loader
+@login_manager.user_loader
+def load_user(user_id):
+    return User(user_id)
+
+# Add login routes
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        # Replace with your actual authentication logic
+        if username == os.getenv('ADMIN_USERNAME') and password == os.getenv('ADMIN_PASSWORD'):
+            user = User(username)
+            login_user(user)
+            return redirect(url_for('index'))
+        return 'Invalid credentials'
+    return render_template('login.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('login'))
+
+# Protect your existing routes with @login_required
 @app.route("/")
+@login_required
 def index():
     # Get the latest image and description files
     image_dir = "./uploaded_images/"
@@ -84,6 +122,7 @@ def index():
 
 # Route for image upload
 @app.route("/upload", methods=["POST"])
+@login_required
 def upload_image():
     logger.info("Image received!")
     image_received_time = time.time()
