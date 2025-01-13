@@ -22,7 +22,7 @@ logger = logging.getLogger("tingjian")
 logger.setLevel(logging.DEBUG)
 
 # Flask application setup
-app = Flask(__name__, static_url_path='/static')
+app = Flask(__name__, static_url_path='/static', static_folder='uploaded_images')
 
 socketio = SocketIO(app)
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -42,6 +42,7 @@ else:
         api_key=qwen_api_key,
         base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
     )
+    logger.info("Qwen client loaded")
 
 
 @app.route("/")
@@ -65,9 +66,10 @@ def index():
 
     # Construct file paths for rendering
     latest_image_url = (
-        f"/uploaded_images/{latest_image}" if latest_image else None
+        url_for("static", filename=latest_image) if latest_image else None
     )
-    print(f"latest_image_url:{latest_image_url}")
+
+    logger.debug(f"latest_image_url:{latest_image_url}")
     latest_description_text = (
         open(os.path.join(image_dir, latest_description)).read()
         if latest_description
