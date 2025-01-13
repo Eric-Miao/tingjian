@@ -43,7 +43,7 @@ qwen_api_key = os.getenv('DASHSCOPE_API_KEY')
 
 # FastAPI application setup
 app = FastAPI()
-app.mount("/static", StaticFiles(directory="uploaded_images"), name="static")
+app.mount("/tingjian/static", StaticFiles(directory="uploaded_images"), name="static")
 templates = Jinja2Templates(directory="templates")
 PREFIX = '/tingjian'
 
@@ -91,7 +91,8 @@ async def index(request: Request):
     latest_image = images[0] if images else None
     latest_description = descriptions[0] if descriptions else None
 
-    latest_image_url = f"/static/{latest_image}" if latest_image else None
+    # latest_image_url = f"/static/{latest_image}" if latest_image else None
+    latest_image_url = app.url_path_for("static", path=latest_image) if latest_image else None
     latest_description_text = (
         open(os.path.join(image_dir, latest_description)).read()
         if latest_description
