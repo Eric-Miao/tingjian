@@ -26,7 +26,7 @@ from flask import jsonify, request
 load_dotenv()
 qwen_api_key = os.getenv('DASHSCOPE_API_KEY')
 API_TOKENS = set(os.getenv('ALLOWED_API_TOKENS', '').split(','))
-
+URL_PREFIX='tingjian'
 
 # Set up logging to display in the console
 logger = logging.getLogger("tingjian")
@@ -171,12 +171,11 @@ def generate_jwt_token(user_id=None,immortal=False):
     )
 
 # Add login routes
-@app.route('/login', methods=['GET', 'POST'])
+@app.route(f"{URL_PREFIX}/login", methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        # Replace with your actual authentication logic
         if username == os.getenv('ADMIN_USERNAME') and password == os.getenv('ADMIN_PASSWORD'):
             user = User(username)
             login_user(user)
@@ -184,7 +183,7 @@ def login():
         return 'Invalid credentials'
     return render_template('login.html')
 
-@app.route('/logout')
+@app.route(f"{URL_PREFIX}/logout")
 @login_required
 def logout():
     logout_user()
@@ -229,7 +228,7 @@ def index():
         latest_description=latest_description_text,
     )
 
-@app.route("/upload", methods=["POST"])
+@app.route(f"{URL_PREFIX}/upload", methods=["POST"])
 # @require_jwt_token
 @require_bearer_token
 def upload_image():
