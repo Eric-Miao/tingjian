@@ -1,7 +1,8 @@
-#include "esp_camera.h"
 #define CAMERA_MODEL_AI_THINKER
 #include "camera_pins.h"
 #include "BluetoothSerial.h"
+#include <esp32cam.h>
+
 
 // Bluetooth
 BluetoothSerial SerialBT;
@@ -47,7 +48,7 @@ void initCamera() {
   cfg.setPins(pins::AiThinker);
   cfg.setResolution(loRes);  // Default resolution
   cfg.setBufferCount(2);
-  cfg.setJpeg(80);
+  cfg.setJpeg(40);
 
   bool ok = Camera.begin(cfg);
   Serial.println(ok ? "Camera initialized successfully." : "Camera initialization failed!");
@@ -58,23 +59,26 @@ void btCallback(esp_spp_cb_event_t event, esp_spp_cb_param_t *param) {
   if (event == ESP_SPP_SRV_OPEN_EVT) {
     Serial.println("Bluetooth Client Connected.");
   } else if (event == ESP_SPP_DATA_IND_EVT) {
-    String command = String((char*)param->data_ind.data).trim();
-    Serial.printf("Received command: %s\n", command.c_str());
+    Serial.printf("ESP_SPP_DATA_IND_EVT len=%d, handle=%d\n\n", param->data_ind.len, param->data_ind.handle);
+    String stringRead = String(*param->data_ind.data);
+    Serial.printf("ParamString: %d\n", stringRead);
 
-    if (command == "start") {
+    if (stringRead == "start") {
       loopActive = true;
       SerialBT.println("Loop started.");
-    } else if (command == "stop") {
+    } else if (stringRead == "stop") {
       loopActive = false;
       SerialBT.println("Loop stopped.");
-    } else if (command.startsWith("res:")) {
-      int resParam = command.substring(4).toInt();
+    } else if (stringRead.startsWith("res:")) {
+      int resParam = stringRead.substring(4).toInt();
       setResolution(resParam);
     } else {
       SerialBT.println("Invalid command.");
     }
   }
 }
+
+
 
 // Set Camera Resolution
 void setResolution(int paramInt) {
