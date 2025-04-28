@@ -155,7 +155,8 @@ async def index(request: Request):
     )
 
 @app.post(f"{PREFIX}/upload")
-async def upload_image(request: Request,credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
+async def upload_image(request: Request, credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
+    logger.info(await request.json())
 
     if credentials.credentials not in os.getenv("BEARER_TOKENS").split(","):
         logger.warning(f"Unauthorized access attempt with token: {credentials.credentials[:10]}...")
@@ -194,7 +195,7 @@ async def ask_image(request: Request, credentials: HTTPAuthorizationCredentials 
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication token"
         )    
-    logger.info(request.json())
+    logger.info(await request.json())
     params = request.query_params
     location = params.get("location", None)
     heading = params.get("heading", None)    
