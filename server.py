@@ -38,13 +38,7 @@ logger.setLevel(logging.DEBUG)
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.DEBUG)
 console_handler.setFormatter(logging.Formatter(
-    '[%(d)s/%(b)s/%(Y)s %(H)s:%(M)s:%(S)s] - %(name)s - %(levelname)s - %(message)s',
-    defaults={'d': datetime.now().strftime('%d'),
-              'b': datetime.now().strftime('%b'),
-              'Y': datetime.now().strftime('%Y'),
-              'H': datetime.now().strftime('%H'),
-              'M': datetime.now().strftime('%M'),
-              'S': datetime.now().strftime('%S')}))
+    '[%(d)s/%(b)s/%(Y)s %(H)s:%(M)s:%(S)s] - %(name)s - %(levelname)s - %(message)s'))
 logger.addHandler(console_handler)
 
 
@@ -255,8 +249,8 @@ def _tongyi_get_description_from_image(image, question="请为我描述周围的
 
     system_prompt = '''
     你是一个导盲助手, 现在一个盲人拍了一张他面前的照片, 你需要将周围的环境. 
-    请简略的描述图片内容, 如果用户没有要求详细回复,描述主要物品,忽略一些小物品.
-    使用中文的口语的风格进行回复.避免使用列表、加粗等格式符号
+    请简明准确语言的描述图片内容, 如果用户没有要求详细回复,描述物品的主要位置,忽略颜色和一些小物品.
+    使用中文进行回复.避免使用列表、加粗等格式符号,只保留文字
     
     你可以使用以下格式描述物体和位置关系:
     1. "在...的前面"、"在...的后面"、"在...的左边"、"在...的右边"、"在...的上面"、"在...的下面"
