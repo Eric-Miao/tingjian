@@ -208,7 +208,7 @@ async def ask_image(request: Request, credentials: HTTPAuthorizationCredentials 
     
     if LATEST_IMAGE:
         question = params.get("question", "请为了仔细描述周围的环境,包括物体和拍摄者的相对位置关系.")
-        description = _tongyi_get_description_from_image(LATEST_IMAGE, question)
+        description = _tongyi_get_followup_from_image(LATEST_IMAGE, question)
         
     else:
         description = "请拍摄一张你面前的照片,我可以为你描述周围的环境,你也可以进一步向我进行提问,我将尽我所能帮助你."
@@ -256,7 +256,7 @@ def _tongyi_get_description_from_image(image, question="请为我描述周围的
     system_prompt = '''
     你是一个导盲助手, 现在一个盲人拍了一张他面前的照片, 你需要将周围的环境. 
     请简略的描述图片内容, 如果用户没有要求详细回复,描述主要物品,忽略一些小物品.
-    使用中文的口语的风格进行回复.避免使用列表、加粗等格式
+    使用中文的口语的风格进行回复.避免使用列表、加粗等格式符号
     
     你可以使用以下格式描述物体和位置关系:
     1. "在...的前面"、"在...的后面"、"在...的左边"、"在...的右边"、"在...的上面"、"在...的下面"
@@ -302,6 +302,46 @@ def _tongyi_get_description_from_image(image, question="请为我描述周围的
     logger.debug(f"Response: {response}")
     logger.info(f"Response content: {response.choices[0].message.content}")
     return response.choices[0].message.content
+
+def _tongyi_get_followup_from_image(image, question="请为我描述周围的环境"):
+    logger.info(f"getting followup using tongyi qwen, question:{question}")
+    base64_image = _base64_encode_image(image)
+
+    system_prompt = '''
+    你是一个导盲助手, 现在一个盲人拍了一张他面前的照片, 你需要根据照片的内容回答他的问题. 
+    使用中文的口语的风格进行回复.避免使用列表、加粗等格式符号
+    
+    '''
+
+    messages = [
+            {"role":"system",
+             "content": [
+                 {
+                    "type": "text",
+                    "text": system_prompt
+                 }
+             ]}
+            ,{
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}, 
+                    },
+                    {"type": "text", "text": question},
+                ],
+            }
+        ]
+
+    response = client.chat.completions.create(
+        model="qwen-vl-max-latest",
+        messages=messages,
+    )
+    
+    logger.debug(f"Response: {response}")
+    logger.info(f"Response content: {response.choices[0].message.content}")
+    return response.choices[0].message.content
+
 
 # Helper function to save images locally
 def _save_image(image):
