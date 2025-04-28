@@ -17,9 +17,25 @@ import jwt
 import uuid
 from typing import Optional
 
+from contextlib import asynccontextmanager
+
 from dotenv import load_dotenv
 from langchain_community.chat_models.tongyi import ChatTongyi
 from langchain_core.messages import HumanMessage, SystemMessage
+
+
+
+# Startup event
+# @app.on_event("startup")
+@asynccontextmanager
+async def lifespan():
+    if not os.path.exists("uploaded_images"):
+        logger.info("Creating uploaded_images directory")
+        os.makedirs("uploaded_images")
+    logger.info("Startup event completed.")
+    yield
+    logger.info("Shutdown event completed.")
+   
 
 # Logging setup
 logger = logging.getLogger("tingjian")
@@ -42,9 +58,10 @@ load_dotenv()
 qwen_api_key = os.getenv('DASHSCOPE_API_KEY')
 
 # FastAPI application setup
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 app.mount("/tingjian/static", StaticFiles(directory="uploaded_images"), name="static")
 templates = Jinja2Templates(directory="templates")
+
 PREFIX = '/tingjian'
 
 # CORS middleware
@@ -171,7 +188,7 @@ def _tongyi_get_description_from_image(image):
     logger.info("getting description using tongyi qwen")
     base64_image = _base64_encode_image(image)
 
-    prompt = "你需要将图片描述给看不到这个图片的人. 请简略的描述图片内容,包括图片中的物体和拍摄者的相对位置关系. 不要提及这是一张图片. 越短越好"
+    prompt = "你需要将图片描述给看不到这个图片的人. 请简略的描述图片内容,包括图片中的物体和拍摄者的相对位置关系. 不要提及这是一张图片. 越短越好,是用中文进行回复"
 
     messages = [
             {"role":"system",
@@ -227,11 +244,5 @@ def _save_description(description):
     logger.debug(f"Description saved as {filename}")
 
 
-# Startup event
-@app.on_event("startup")
-async def startup_event():
-    if not os.path.exists("uploaded_images"):
-        logger.info("Creating uploaded_images directory")
-        os.makedirs("uploaded_images")
 
 # Note: Remove the __main__ block since FastAPI uses uvicorn
