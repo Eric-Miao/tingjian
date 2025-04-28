@@ -4,7 +4,9 @@ import os
 import time
 from datetime import datetime, timedelta, UTC
 from PIL import Image
-from fastapi import FastAPI, Request, Response, HTTPException, status, Depends
+from fastapi import FastAPI, Request, Response, HTTPException, status, Depends,Security
+from fastapi.security.api_key import APIKeyHeader
+
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -13,29 +15,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from openai import OpenAI
 import logging
 from functools import wraps
-import jwt
-import uuid
 from typing import Optional
 
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
+
 from langchain_community.chat_models.tongyi import ChatTongyi
 from langchain_core.messages import HumanMessage, SystemMessage
 
+# Configuration
+load_dotenv()
 
-
-# Startup event
-# @app.on_event("startup")
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    if not os.path.exists("uploaded_images"):
-        logger.info("Creating uploaded_images directory")
-        os.makedirs("uploaded_images")
-    logger.info("Startup event completed.")
-    yield
-    logger.info("Shutdown event completed.")
-   
 
 # Logging setup
 logger = logging.getLogger("tingjian")
@@ -53,12 +44,32 @@ console_handler.setFormatter(logging.Formatter(
 logger.addHandler(console_handler)
 
 
-# Configuration
-load_dotenv()
-qwen_api_key = os.getenv('DASHSCOPE_API_KEY')
+# Startup event
+# @app.on_event("startup")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if not os.path.exists("uploaded_images"):
+        logger.info("Creating uploaded_images directory")
+        os.makedirs("uploaded_images")
+    logger.info("Startup event completed.")
+    yield
+    logger.info("Shutdown event completed.")
+
+# # 给swagger添加请求头Authorization
+# api_key_header = APIKeyHeader(name="Authorization", auto_error=False)
+
+
+# async def get_api_key(api_key: Optional[str] = Security(api_key_header)):
+#     if api_key is None:
+#         raise HTTPException(status_code=403, detail="API key is missing")
+
+#     return api_key
+
+
 
 # FastAPI application setup
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(lifespan=lifespan, dependencies=[Depends(get_api_key)])
+
 app.mount("/tingjian/static", StaticFiles(directory="uploaded_images"), name="static")
 templates = Jinja2Templates(directory="templates")
 
@@ -78,17 +89,17 @@ bearer_scheme = HTTPBearer()
 # OpenAI and Qwen client setup
 if os.environ.get("API_KEY"):
     client = OpenAI(api_key=os.environ["API_KEY"])
-else:
-    logger.info("Missing API_KEY")
-
-if qwen_api_key:
+elif os.getenv('DASHSCOPE_API_KEY'):
     client = OpenAI(
-        api_key=qwen_api_key,
+        api_key=os.getenv('DASHSCOPE_API_KEY'),
         base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
     )
     logger.info("Qwen client loaded")
 else:
-    logger.info("Missing Qwen API KEY")
+    logger.info("Missing LLM KEY")
+    client = None
+    raise ValueError("Missing LLM KEY")
+
 
 # Routes
 @app.get(f"{PREFIX}/", response_class=HTMLResponse)
@@ -151,7 +162,7 @@ async def upload_image(request: Request,credentials: HTTPAuthorizationCredential
     )
     
     return {"status": "OK",
-            "description":description}
+            "description": description}
 
 # Helper functions remain largely the same
 def _base64_encode_image(image):
@@ -242,6 +253,9 @@ def _save_description(description):
     ) as message_file:
         message_file.write(description)
     logger.debug(f"Description saved as {filename}")
+
+
+
 
 
 
