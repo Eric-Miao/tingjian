@@ -28,7 +28,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 # Startup event
 # @app.on_event("startup")
 @asynccontextmanager
-async def lifespan():
+async def lifespan(app: FastAPI):
     if not os.path.exists("uploaded_images"):
         logger.info("Creating uploaded_images directory")
         os.makedirs("uploaded_images")
