@@ -17,6 +17,8 @@ import logging
 from functools import wraps
 from typing import Optional
 
+import json
+
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
@@ -47,17 +49,24 @@ logger.addHandler(console_handler)
 
 
 # Startup event
-# @app.on_event("startup")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     if not os.path.exists("uploaded_images"):
         logger.info("Creating uploaded_images directory")
         os.makedirs("uploaded_images")
-    logger.info("Startup event completed.")
+    logger.debug("Startup event completed.")
     yield
-    logger.info("Shutdown event completed.")
+    logger.debug("Shutdown event completed.")
 
-app = FastAPI(lifespan=lifespan)
+async def some_authz_func(request: Request):
+    try:
+        json_ = await request.json()
+    except json.decoder.JSONDecodeError:
+        json_ = None
+    logger.debug(vars(request), json_)
+
+
+app = FastAPI(lifespan=lifespan,dependencies=[Depends(some_authz_func)])
 
 app.mount("/tingjian/static", StaticFiles(directory="uploaded_images"), name="static")
 templates = Jinja2Templates(directory="templates")
