@@ -38,7 +38,7 @@ logger.setLevel(logging.DEBUG)
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.DEBUG)
 console_handler.setFormatter(logging.Formatter(
-    '[%(d)s/%(b)s/%(Y)s %(H)s:%(M)s:%(S)s] - %(name)s - %(levelname)s - %(message)s'))
+    '[%(asctime)s] - %(name)s - %(levelname)s - %(message)s', datefmt='%d/%b/%Y %H:%M:%S'))
 logger.addHandler(console_handler)
 
 
