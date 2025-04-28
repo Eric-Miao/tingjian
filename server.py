@@ -195,11 +195,9 @@ async def ask_image(request: Request, credentials: HTTPAuthorizationCredentials 
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication token"
         )    
-    logger.info(await request.json())
-    params = request.query_params
-    location = params.get("location", None)
-    heading = params.get("heading", None)    
-    
+
+    params = await request.json()
+    logger.info(f"Ask params: {params}")
     
     if LATEST_IMAGE:
         question = params.get("question", "请为了仔细描述周围的环境,包括物体和拍摄者的相对位置关系.")
