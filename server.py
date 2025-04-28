@@ -60,10 +60,35 @@ async def lifespan(app: FastAPI):
 
 async def some_authz_func(request: Request):
     try:
-        json_ = await request.json()
-    except json.decoder.JSONDecodeError:
-        json_ = None
-    logger.debug(vars(request), json_)
+        body = await request.body()
+        # Store the body content for later use
+        request.state.body = body
+        # Try to parse as JSON if possible
+        try:
+            json_data = json.loads(body)
+            request.state.json = json_data
+            json_str = json.dumps(json_data, indent=2)
+        except json.decoder.JSONDecodeError:
+            json_str = "Not JSON data"
+            request.state.json = None
+            
+        # Log key request information
+        logger.debug(f"Request received: {request.method} {request.url}")
+        logger.debug(f"Headers: {dict(request.headers)}")
+        logger.debug(f"Query params: {dict(request.query_params)}")
+        logger.debug(f"Body content: {body[:200]}..." if len(body) > 200 else f"Body content: {body}")
+        logger.debug(f"JSON content: {json_str}")
+        
+        # Create a new body stream for FastAPI to read again
+        async def get_body():
+            return request.state.body
+            
+        request._body = get_body
+        
+    except Exception as e:
+        logger.error(f"Error processing request: {str(e)}")
+        
+    return None
 
 
 app = FastAPI(lifespan=lifespan,dependencies=[Depends(some_authz_func)])
