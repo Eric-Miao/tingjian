@@ -194,7 +194,7 @@ async def ask_image(request: Request, credentials: HTTPAuthorizationCredentials 
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication token"
         )    
-        
+    logger.info(request.json())
     params = request.query_params
     location = params.get("location", None)
     heading = params.get("heading", None)    
