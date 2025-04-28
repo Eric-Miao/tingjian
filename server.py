@@ -91,7 +91,10 @@ async def some_authz_func(request: Request):
     return None
 
 
-app = FastAPI(lifespan=lifespan,dependencies=[Depends(some_authz_func)])
+app = FastAPI(
+    lifespan=lifespan,
+    # dependencies=[Depends(some_authz_func)]
+    )
 
 app.mount("/tingjian/static", StaticFiles(directory="uploaded_images"), name="static")
 templates = Jinja2Templates(directory="templates")
@@ -103,8 +106,8 @@ PREFIX = '/tingjian'
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    # allow_methods=["GET", "POST"],
-    # allow_headers=["Authorization", "Content-Type"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 # OpenAI and Qwen client setup
@@ -188,9 +191,9 @@ async def upload_image(request: Request,credentials: HTTPAuthorizationCredential
     return {"status": "OK",
             "description": description}
 
-@app.get(f"{PREFIX}/ask")
+@app.post(f"{PREFIX}/ask")
 async def ask_image(request: Request, credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
-
+    
     if credentials.credentials not in os.getenv("BEARER_TOKENS").split(","):
         logger.warning(f"Unauthorized access attempt with token: {credentials.credentials[:10]}...")
         raise HTTPException(
