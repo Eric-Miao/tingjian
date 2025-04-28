@@ -27,6 +27,8 @@ from langchain_core.messages import HumanMessage, SystemMessage
 # Configuration
 load_dotenv()
 
+LATEST_IMAGE = None
+STATIC_IMAGE_DIR = "./uploaded_images/"
 
 # Logging setup
 logger = logging.getLogger("tingjian")
@@ -138,6 +140,9 @@ async def upload_image(request: Request,credentials: HTTPAuthorizationCredential
     body = await request.body()
     image = Image.open(io.BytesIO(body))
     filename = _save_image(image)
+    
+    global LATEST_IMAGE
+    LATEST_IMAGE = filename
 
     description = _tongyi_get_description_from_image(filename)
     _save_description(description)
@@ -148,6 +153,33 @@ async def upload_image(request: Request,credentials: HTTPAuthorizationCredential
     
     return {"status": "OK",
             "description": description}
+
+@app.get(f"{PREFIX}/ask")
+async def ask_image(request: Request, credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
+
+    if credentials.credentials not in os.getenv("BEARER_TOKENS").split(","):
+        logger.warning(f"Unauthorized access attempt with token: {credentials.credentials[:10]}...")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token"
+        )    
+        
+    params = request.query_params
+    location = params.get("location", None)
+    heading = params.get("heading", None)    
+    
+    
+    if LATEST_IMAGE:
+        question = params.get("question", "请为了仔细描述周围的环境,包括物体和拍摄者的相对位置关系.")
+        description = _tongyi_get_description_from_image(LATEST_IMAGE, question)
+        
+    else:
+        description = "请拍摄一张你面前的照片,我可以为你描述周围的环境,你也可以进一步向我进行提问,我将尽我所能帮助你."
+        
+    logger.info(f"Description: {description}")
+    return {"status": "OK",
+            "description": description}
+        
 
 # Helper functions remain largely the same
 def _base64_encode_image(image):
@@ -180,18 +212,42 @@ def _get_description_from_image(image):
     logger.info(f"Response content: {response.choices[0].message.content}")
     return response.choices[0].message.content
 
-def _tongyi_get_description_from_image(image):
+def _tongyi_get_description_from_image(image, question="请为我描述周围的环境"):
     logger.info("getting description using tongyi qwen")
     base64_image = _base64_encode_image(image)
 
-    prompt = "你需要将图片描述给看不到这个图片的人. 请简略的描述图片内容,包括图片中的物体和拍摄者的相对位置关系. 不要提及这是一张图片. 越短越好,是用中文进行回复"
+    system_prompt = '''
+    你是一个导盲助手, 现在一个盲人拍了一张他面前的照片, 你需要将图片描述给他. 
+    请简略的描述图片内容,包括图片中的物体和拍摄者的相对位置关系. 
+    不要提及这是一张图片. 如果用户没有要求详细回复,请描述的相对简洁.
+    使用中文进行回复.
+    
+    你可以使用以下格式描述物体和位置关系:
+    1. "在前面"、"在后面"、"在左边"、"在右边"、"在上面"、"在下面"
+    2. "在...的前面"、"在...的后面"、"在...的左边"、"在...的右边"、"在...的上面"、"在...的下面"
+    3. "在...的左上角"、"在...的右上角"、"在...的左下角"、"在...的右下角"
+    4. "在...的中间"、"在...的中心"、"在...的边缘"、"在...的角落"
+    5. "在...的旁边"、"在...的附近"、"在...的周围"、"在...的对面"
+    6. "在...的上方"、"在...的下方"、"在...的前方"、"在...的后方"
+
+    如果有如下物品请注意描述不要忽略:
+    1. 交通信号灯, 如 ”现在是红灯“
+    2. 人行横道线, 如 ”人行横道线在正前面“
+    3. 交通站点建筑, 如 ”公交车站在左边“
+    4. 地名/位置 指示牌, 如 ”1号出口在右边“
+    5. 盲道, 如 ”盲道在右边“
+    
+    如果照片中道路被堵塞, 请你描述道路的情况和周围的环境。帮助用户离开堵塞的地方.
+    例如: "前面有一辆车挡住了路, 你可以向左转, 继续前行." "前方有一个大坑, 请小心行走." "前面有一个人挡住了路, 请向右转." "前面有一个台阶, 请小心上下." "前方有一个栏杆,请向右转绕开."
+    
+    '''
 
     messages = [
             {"role":"system",
              "content": [
                  {
                     "type": "text",
-                    "text": prompt 
+                    "text": system_prompt
                  }
              ]}
             ,{
@@ -201,7 +257,7 @@ def _tongyi_get_description_from_image(image):
                         "type": "image_url",
                         "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}, 
                     },
-                    {"type": "text", "text": "这是什么?"},
+                    {"type": "text", "text": question},
                 ],
             }
         ]
@@ -217,12 +273,12 @@ def _tongyi_get_description_from_image(image):
 
 # Helper function to save images locally
 def _save_image(image):
-    static_image_dir = "./uploaded_images/"
-    if not os.path.exists(static_image_dir):
-        os.makedirs(static_image_dir)
+    
+    if not os.path.exists(STATIC_IMAGE_DIR):
+        os.makedirs(STATIC_IMAGE_DIR)
 
     datestr = datetime.now().strftime("%Y-%m-%d_%H%M%S.%f")[:-3]
-    filename = os.path.join(static_image_dir, f"{datestr}.jpg")
+    filename = os.path.join(STATIC_IMAGE_DIR, f"{datestr}.jpg")
     image.save(fp=filename)
     logger.debug(f"Image saved as {filename}")
     return filename
@@ -230,7 +286,7 @@ def _save_image(image):
 # Helper function to save descriptions locally
 def _save_description(description):
     datestr = datetime.now().strftime("%Y-%m-%d_%H%M%S.%f")[:-3]
-    filename = f"./uploaded_images/{datestr}.txt"
+    filename = os.path.join(STATIC_IMAGE_DIR, f"{datestr}.txt")
     with open(
         file=filename,
         mode="w",
