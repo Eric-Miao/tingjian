@@ -55,24 +55,12 @@ async def lifespan(app: FastAPI):
     yield
     logger.info("Shutdown event completed.")
 
-# # 给swagger添加请求头Authorization
-# api_key_header = APIKeyHeader(name="Authorization", auto_error=False)
-
-
-# async def get_api_key(api_key: Optional[str] = Security(api_key_header)):
-#     if api_key is None:
-#         raise HTTPException(status_code=403, detail="API key is missing")
-
-#     return api_key
-
-
-
-# FastAPI application setup
-app = FastAPI(lifespan=lifespan, dependencies=[Depends(get_api_key)])
+app = FastAPI(lifespan=lifespan)
 
 app.mount("/tingjian/static", StaticFiles(directory="uploaded_images"), name="static")
 templates = Jinja2Templates(directory="templates")
-
+# Security
+bearer_scheme = HTTPBearer()
 PREFIX = '/tingjian'
 
 # CORS middleware
@@ -82,9 +70,6 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["Authorization", "Content-Type"],
 )
-
-# Security
-bearer_scheme = HTTPBearer()
 
 # OpenAI and Qwen client setup
 if os.environ.get("API_KEY"):
