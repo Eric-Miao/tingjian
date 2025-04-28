@@ -2,10 +2,12 @@
 #include <WiFi.h>
 #include <esp32cam.h>
 #include <HTTPClient.h>
+#include <WiFiManager.h> // https://github.com/tzapu/WiFiManager
+
 
 const char* WIFI_SSID = ""; 
 const char* WIFI_PASS = "";
-const char *httpPostServer = "http://192.168.31.19/upload";
+const char *httpPostServer = "https://project.ericmiao.xyz/tingjian/upload";
 
 WebServer server(80);
 
@@ -51,6 +53,46 @@ void stopLoop() {
   server.send(200, "text/plain", "Loop stopped");
 }
 
+
+
+ 
+ 
+void WiFisetup() {
+    WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
+    // it is a good practice to make sure your code sets wifi mode how you want it.
+ 
+    // put your setup code here, to run once:
+    Serial.begin(115200);
+    
+    //WiFiManager, Local intialization. Once its business is done, there is no need to keep it around
+    WiFiManager wm;
+ 
+    // reset settings - wipe stored credentials for testing
+    // these are stored by the esp library
+    // wm.resetSettings();
+ 
+    // Automatically connect using saved credentials,
+    // if connection fails, it starts an access point with the specified name ( "AutoConnectAP"),
+    // if empty will auto generate SSID, if password is blank it will be anonymous AP (wm.autoConnect())
+    // then goes into a blocking loop awaiting configuration and will return success result
+ 
+    bool res;
+    // res = wm.autoConnect(); // auto generated AP name from chipid
+    res = wm.autoConnect("AutoConnectAP"); // anonymous ap
+    // res = wm.autoConnect("AutoConnectAP","password"); // password protected ap
+ 
+    if(!res) {
+        Serial.println("Failed to connect");
+        // ESP.restart();
+    } 
+    else {
+        //if you get here you have connected to the WiFi    
+        Serial.println("connected...yeey :)");
+    }
+ 
+}
+
+
 void setup() {
   Serial.begin(115200);
   Serial.println();
@@ -67,7 +109,8 @@ void setup() {
   }
   WiFi.persistent(false);
   WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  // WiFi.begin(WIFI_SSID, WIFI_PASS);
+  WiFisetup();
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
   }
@@ -93,7 +136,11 @@ void uploadImage(uint8_t *imageData, size_t len) {
     WiFiClient client;
     HTTPClient http;
 
+    String recv_token = "nRD34AjaTPD-JSwd_Tff3VlNyUJmforx2P07jdHpylU"; // Complete Bearer token
+    recv_token = "Bearer " + recv_token;	// Adding "Bearer " before token
     http.begin(client, httpPostServer);
+
+    // http.addHeader("Authorization", recv_token); // Adding Bearer token as HTTP header
     http.addHeader("Content-Type", "image/jpeg");
 
     int httpResponseCode = http.POST(imageData, len);
