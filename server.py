@@ -54,9 +54,9 @@ async def lifespan(app: FastAPI):
     if not os.path.exists("uploaded_images"):
         logger.info("Creating uploaded_images directory")
         os.makedirs("uploaded_images")
-    logger.debug("Startup event completed.")
+    logger.info("Startup event completed.")
     yield
-    logger.debug("Shutdown event completed.")
+    logger.info("Shutdown event completed.")
 
 async def some_authz_func(request: Request):
     try:
@@ -103,8 +103,8 @@ PREFIX = '/tingjian'
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_methods=["GET", "POST"],
-    allow_headers=["Authorization", "Content-Type"],
+    # allow_methods=["GET", "POST"],
+    # allow_headers=["Authorization", "Content-Type"],
 )
 
 # OpenAI and Qwen client setup
