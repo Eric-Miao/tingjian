@@ -156,7 +156,6 @@ async def index(request: Request):
 
 @app.post(f"{PREFIX}/upload")
 async def upload_image(request: Request, credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
-    logger.info(await request.json())
 
     if credentials.credentials not in os.getenv("BEARER_TOKENS").split(","):
         logger.warning(f"Unauthorized access attempt with token: {credentials.credentials[:10]}...")
