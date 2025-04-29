@@ -17,7 +17,7 @@ except ImportError:
 
 
 class LogUtils:
-    DEFAULT_FORMAT = "%(name)s: %(asctime)s | %(levelname)s | %(filename)s:%(lineno)s | %(process)d >>> %(message)s"
+    DEFAULT_FORMAT = "%(name)s: %(asctime)s | %(levelname)s | %(filename)s:%(lineno)s: %(message)s"
     DEFAULT_LOG_DIR = "logs"
     LOG_FILE = f"{os.path.splitext(os.path.basename(sys.argv[0]))[0]}_{datetime.now().strftime('%Y-%m-%d')}"
     DEFAULT_LOG_FILE = f"{LOG_FILE}.log"
