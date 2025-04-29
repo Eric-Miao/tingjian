@@ -107,12 +107,14 @@ app.add_middleware(
 # OpenAI and Qwen client setup
 if os.environ.get("API_KEY"):
     client = OpenAI(api_key=os.environ["API_KEY"])
+    
 elif os.getenv('DASHSCOPE_API_KEY'):
     client = OpenAI(
         api_key=os.getenv('DASHSCOPE_API_KEY'),
-        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        base_url=os.getenv('DASHSCOPE_BASE_URL'),
     )
-    logger.info("Qwen client loaded")
+    DASHSCOPE_MODEL = os.getenv('DASHSCOPE_MODEL', 'gpt-4o-mini')
+    logger.info("Qwen client loaded with model: %s", DASHSCOPE_MODEL)
 else:
     logger.info("Missing LLM KEY")
     client = None
@@ -246,8 +248,8 @@ def _tongyi_get_description_from_image(image, question="请为我描述周围的
     base64_image = _base64_encode_image(image)
 
     system_prompt = '''
-    你是一个导盲助手, 现在一个盲人拍了一张他面前的照片, 你需要将周围的环境. 
-    请简明准确语言的描述图片内容, 如果用户没有要求详细回复,描述物品的主要位置,忽略颜色和一些小物品.
+    你是一个导盲助手, 这是一张来自盲人举起手机拍摄的正前方的照片.照片的左侧是拍摄者的左手方向 , 右侧是拍摄者的右手方向.
+    请简明准确语言的描述环境, 如果用户没有要求详细回复,描述物品的主要位置,忽略颜色、光影和一些小物品.
     使用中文进行回复.避免使用列表、加粗等格式符号,只保留文字
     
     你可以使用以下格式描述物体和位置关系:
@@ -287,7 +289,7 @@ def _tongyi_get_description_from_image(image, question="请为我描述周围的
         ]
 
     response = client.chat.completions.create(
-        model="qwen-vl-max-latest",
+        model=DASHSCOPE_MODEL,
         messages=messages,
     )
     
@@ -300,8 +302,8 @@ def _tongyi_get_followup_from_image(image, question="请为我描述周围的环
     base64_image = _base64_encode_image(image)
 
     system_prompt = '''
-    你是一个导盲助手, 现在一个盲人拍了一张他面前的照片, 你需要根据照片的内容回答他的问题. 
-    使用中文的口语的风格进行回复.避免使用列表、加粗等格式符号
+    你是一个导盲助手. 这是一张来自盲人举起手机拍摄的正前方的照片, 照片的左侧是拍摄者的左手方向 , 右侧是拍摄者的右手方向.
+    使用中文的口语的风格进行回复.避免使用列表、加粗等格式符号, 只保留文字。
     
     '''
 
@@ -326,7 +328,7 @@ def _tongyi_get_followup_from_image(image, question="请为我描述周围的环
         ]
 
     response = client.chat.completions.create(
-        model="qwen-vl-max-latest",
+        model=DASHSCOPE_MODEL,
         messages=messages,
     )
     
