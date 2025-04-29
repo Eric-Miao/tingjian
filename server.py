@@ -1,4 +1,3 @@
-import base64
 import io
 import os
 import time
@@ -12,8 +11,6 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
-from openai import OpenAI
-import logging
 from functools import wraps
 from typing import Optional
 
@@ -21,26 +18,20 @@ import json
 
 from contextlib import asynccontextmanager
 
-from dotenv import load_dotenv
 
-from langchain_community.chat_models.tongyi import ChatTongyi
-from langchain_core.messages import HumanMessage, SystemMessage
+from llm_core.llm_core import tingjianLLM
+from utils.log_utils import get_logger
+
+
+
+logger = get_logger()
+
+llm_client = tingjianLLM()  
 
 # Configuration
-load_dotenv()
 
 LATEST_IMAGE = None
 STATIC_IMAGE_DIR = "./uploaded_images/"
-
-# Logging setup
-logger = logging.getLogger("tingjian")
-logger.setLevel(logging.DEBUG)
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.DEBUG)
-console_handler.setFormatter(logging.Formatter(
-    '[%(asctime)s] - %(name)s - %(levelname)s - %(message)s', datefmt='%d/%b/%Y %H:%M:%S'))
-logger.addHandler(console_handler)
-
 
 # Startup event
 @asynccontextmanager
@@ -104,22 +95,6 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type"],
 )
 
-# OpenAI and Qwen client setup
-if os.environ.get("API_KEY"):
-    client = OpenAI(api_key=os.environ["API_KEY"])
-    
-elif os.getenv('DASHSCOPE_API_KEY'):
-    client = OpenAI(
-        api_key=os.getenv('DASHSCOPE_API_KEY'),
-        base_url=os.getenv('DASHSCOPE_BASE_URL'),
-    )
-    DASHSCOPE_MODEL = os.getenv('DASHSCOPE_MODEL', 'gpt-4o-mini')
-    logger.info("Qwen client loaded with model: %s", DASHSCOPE_MODEL)
-else:
-    logger.info("Missing LLM KEY")
-    client = None
-    raise ValueError("Missing LLM KEY")
-
 
 # Routes
 @app.get(f"{PREFIX}/", response_class=HTMLResponse)
@@ -177,7 +152,7 @@ async def upload_image(request: Request, credentials: HTTPAuthorizationCredentia
     global LATEST_IMAGE
     LATEST_IMAGE = filename
 
-    description = _tongyi_get_description_from_image(filename)
+    description = llm_client.tongyi_get_description_from_image(filename)
     _save_description(description)
 
     logger.info(
@@ -202,7 +177,7 @@ async def ask_image(request: Request, credentials: HTTPAuthorizationCredentials 
     
     if LATEST_IMAGE:
         question = params.get("question", "请为了仔细描述周围的环境,包括物体和拍摄者的相对位置关系.")
-        description = _tongyi_get_followup_from_image(LATEST_IMAGE, question)
+        description = llm_client.tongyi_get_followup_from_image(LATEST_IMAGE, question)
         
     else:
         description = "请拍摄一张你面前的照片,我可以为你描述周围的环境,你也可以进一步向我进行提问,我将尽我所能帮助你."
@@ -211,131 +186,6 @@ async def ask_image(request: Request, credentials: HTTPAuthorizationCredentials 
     return {"status": "OK",
             "description": description}
         
-
-# Helper functions remain largely the same
-def _base64_encode_image(image):
-    with open(image, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode('utf-8')
-
-
-# Helper function to generate descriptions using OpenAI
-def _get_description_from_image(image):
-    base64_image = _base64_encode_image(image)
-
-    prompt = "Give a short description of the image and where objects are located in the image. Do not mention that this is an image. Do not mention weather or geographical location. Less text is better."
-
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
-                    },
-                ],
-            }
-        ],
-    )
-    logger.debug(f"Response: {response}")
-    logger.info(f"Response content: {response.choices[0].message.content}")
-    return response.choices[0].message.content
-
-def _tongyi_get_description_from_image(image, question="请为我描述周围的环境"):
-    logger.info("getting description using tongyi qwen")
-    base64_image = _base64_encode_image(image)
-
-    system_prompt = '''
-    你是一个导盲助手, 这是一张来自盲人举起手机拍摄的正前方的照片.照片的左侧是拍摄者的左手方向 , 右侧是拍摄者的右手方向.
-    请简明准确语言的描述环境, 如果用户没有要求详细回复,描述物品的主要位置,忽略颜色、光影和一些小物品.
-    使用中文进行回复.避免使用列表、加粗等格式符号,只保留文字
-    
-    你可以使用以下格式描述物体和位置关系:
-    1. "在...的前面"、"在...的后面"、"在...的左边"、"在...的右边"、"在...的上面"、"在...的下面"
-    2. "在...的旁边"、"在...的附近"、"在...的周围"、"在...的对面"
-
-    如果有如下物品请注意描述不要忽略:
-    1. 交通信号灯, 如 ”现在是红灯“
-    2. 人行横道线, 如 ”人行横道线在正前面“
-    3. 交通站点建筑, 如 ”公交车站在左边“ “前方是地下通道入口”
-    4. 地名/位置 指示牌, 如 ”1号出口在右边“ “这里是地铁10号线的入口”
-    5. 盲道, 如 ”盲道在右边“
-    
-    如果照片中道路被堵塞, 请你描述道路的情况和周围的环境。帮助用户离开堵塞的地方.
-    例如: "前面有一辆车挡住了路, 你可以向左转, 继续前行." "前方有一个大坑, 请小心行走." "前面有一个人挡住了路, 请向右转." "前面有一个台阶, 请小心上下." "前方有一个栏杆,请向右转绕开."
-    
-    '''
-
-    messages = [
-            {"role":"system",
-             "content": [
-                 {
-                    "type": "text",
-                    "text": system_prompt
-                 }
-             ]}
-            ,{
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}, 
-                    },
-                    {"type": "text", "text": question},
-                ],
-            }
-        ]
-
-    response = client.chat.completions.create(
-        model=DASHSCOPE_MODEL,
-        messages=messages,
-    )
-    
-    logger.debug(f"Response: {response}")
-    logger.info(f"Response content: {response.choices[0].message.content}")
-    return response.choices[0].message.content
-
-def _tongyi_get_followup_from_image(image, question="请为我描述周围的环境"):
-    logger.info(f"getting followup using tongyi qwen, question:{question}")
-    base64_image = _base64_encode_image(image)
-
-    system_prompt = '''
-    你是一个导盲助手. 这是一张来自盲人举起手机拍摄的正前方的照片, 照片的左侧是拍摄者的左手方向 , 右侧是拍摄者的右手方向.
-    使用中文的口语的风格进行回复.避免使用列表、加粗等格式符号, 只保留文字。
-    
-    '''
-
-    messages = [
-            {"role":"system",
-             "content": [
-                 {
-                    "type": "text",
-                    "text": system_prompt
-                 }
-             ]}
-            ,{
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}, 
-                    },
-                    {"type": "text", "text": question},
-                ],
-            }
-        ]
-
-    response = client.chat.completions.create(
-        model=DASHSCOPE_MODEL,
-        messages=messages,
-    )
-    
-    logger.debug(f"Response: {response}")
-    logger.info(f"Response content: {response.choices[0].message.content}")
-    return response.choices[0].message.content
-
 
 # Helper function to save images locally
 def _save_image(image):
