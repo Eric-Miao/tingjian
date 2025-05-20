@@ -81,11 +81,11 @@ app = FastAPI(
     # dependencies=[Depends(some_authz_func)]
     )
 
-app.mount("/tingjian/static", StaticFiles(directory="uploaded_images"), name="static")
+app.mount("/app/static", StaticFiles(directory="uploaded_images"), name="static")
 templates = Jinja2Templates(directory="templates")
 # Security
 bearer_scheme = HTTPBearer()
-PREFIX = '/tingjian'
+PREFIX = '/app'
 
 # CORS middleware
 app.add_middleware(
