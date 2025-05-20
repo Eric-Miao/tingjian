@@ -195,9 +195,11 @@ def _save_image(image):
 
     datestr = datetime.now().strftime("%Y-%m-%d_%H%M%S.%f")[:-3]
     filename = os.path.join(STATIC_IMAGE_DIR, f"{datestr}.jpg")
-    img_corrected = ImageOps.exif_transpose(image)
-    logger.info('Image orientation corrected')
-    img_corrected.save(fp=filename)
+    # img_corrected = ImageOps.exif_transpose(image)
+    # logger.info('Image orientation corrected')
+    # img_corrected.save(fp=filename)
+    
+    image.save(fp=filename)
     logger.debug(f"Image saved as {filename}")
     return filename
 
