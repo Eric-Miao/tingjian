@@ -2,7 +2,7 @@ import io
 import os
 import time
 from datetime import datetime, timedelta, UTC
-from PIL import Image
+from PIL import Image, ImageOps
 from fastapi import FastAPI, Request, Response, HTTPException, status, Depends,Security
 from fastapi.security.api_key import APIKeyHeader
 
@@ -195,6 +195,10 @@ def _save_image(image):
 
     datestr = datetime.now().strftime("%Y-%m-%d_%H%M%S.%f")[:-3]
     filename = os.path.join(STATIC_IMAGE_DIR, f"{datestr}.jpg")
+    # img_corrected = ImageOps.exif_transpose(image)
+    # logger.info('Image orientation corrected')
+    # img_corrected.save(fp=filename)
+    
     image.save(fp=filename)
     logger.debug(f"Image saved as {filename}")
     return filename
