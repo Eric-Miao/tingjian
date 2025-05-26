@@ -18,3 +18,5 @@ uploaded_images/
 
 __pycache__/
 logs/
+
+*.pt
